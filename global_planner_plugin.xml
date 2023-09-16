@@ -1,0 +1,5 @@
+<library path="nav2_mod_planner_plugin">
+	<class name="nav2_mod_planner/MoDPlanner" type="nav2_mod_planner::MoDPlanner" base_class_type="nav2_core::GlobalPlanner">
+	  <description>This Planner utilizes OMPL and Maps of Dynamics to produce MoD-aware paths.</description>
+	</class>
+</library>
