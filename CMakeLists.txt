@@ -25,6 +25,8 @@ find_package(pluginlib REQUIRED)
 find_package(mod REQUIRED)
 find_package(ompl REQUIRED)
 
+MESSAGE(STATUS "OMPL_INCLUDE_DIR: ${OMPL_INCLUDE_DIR}")
+
 include_directories(
         include
         ${OMPL_INCLUDE_DIR}

@@ -9,184 +9,237 @@
 
 namespace nav2_mod_planner {
 
-MoDPlanner::MoDPlanner() : footprint_collision_checker_(nullptr) {}
+    MoDPlanner::MoDPlanner() {}
 
-void MoDPlanner::configure(
-    rclcpp_lifecycle::LifecycleNode::SharedPtr parent, std::string name,
-    std::shared_ptr<tf2_ros::Buffer> tf,
-    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) {
-  node_ = parent;
-  tf_ = tf;
-  name_ = name;
-  costmap_ = costmap_ros->getCostmap();
-  global_frame_ = costmap_ros->getGlobalFrameID();
+    void MoDPlanner::configure(
+            rclcpp_lifecycle::LifecycleNode::SharedPtr parent, std::string name,
+            std::shared_ptr<tf2_ros::Buffer> tf,
+            std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) {
+        node_ = parent;
+        tf_ = tf;
+        name_ = name;
+        costmap_ = costmap_ros->getCostmap();
+        global_frame_ = costmap_ros->getGlobalFrameID();
 
-  // Initialize footprint collision checker
-  footprint_collision_checker_.setCostmap(costmap_);
+        std::shared_ptr<nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>> footprint_collision_checker_ptr = std::make_shared<nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>>(
+                costmap_);
 
-  // Initialize planner params using
-  // nav2_util::declare_parameter_if_not_declared
+        state_validity_checker_ = std::make_shared<FootprintStateValidityChecker>(simple_setup_->getSpaceInformation(),
+                                                                                  footprint_collision_checker_ptr.get(),
+                                                                                  costmap_ros->getRobotFootprint());
+        // Initialize planner params using
+        // nav2_util::declare_parameter_if_not_declared
 
-  // Get turning radius
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".steering_params.turning_radius",
-      rclcpp::ParameterValue(0.5));
-  node_->get_parameter(name_ + ".steering_params.turning_radius",
-                       steering_params_.turning_radius);
+        // Get turning radius
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".steering_params.turning_radius",
+                rclcpp::ParameterValue(0.5));
+        node_->get_parameter(name_ + ".steering_params.turning_radius",
+                             steering_params_.turning_radius);
 
-  // Get max vehicle speed
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".steering_params.max_vehicle_speed",
-      rclcpp::ParameterValue(1.0));
-  node_->get_parameter(name_ + ".steering_params.max_vehicle_speed",
-                       steering_params_.max_vehicle_speed);
+        // Get max vehicle speed
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".steering_params.max_vehicle_speed",
+                rclcpp::ParameterValue(1.0));
+        node_->get_parameter(name_ + ".steering_params.max_vehicle_speed",
+                             steering_params_.max_vehicle_speed);
 
-  // Get footprint
-  std::string footprint_string;
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".steering_params.footprint",
-      rclcpp::ParameterValue(
-          std::string("[[0.5,-0.5],[0.5,0.5],[-0.5,0.5],[-0.5,-0.5]]")));
-  node_->get_parameter(name_ + ".steering_params.footprint", footprint_string);
-  if (nav2_costmap_2d::makeFootprintFromString(footprint_string,
-                                               steering_params_.footprint)) {
-    RCLCPP_ERROR(node_->get_logger(), "Failed to parse footprint parameter, "
-                                      "using a square footprint of size 1x1");
-    nav2_costmap_2d::makeFootprintFromString(
-        "[[0.5,-0.5],[0.5,0.5],[-0.5,0.5],[-0.5,-0.5]]",
-        steering_params_.footprint);
-  } else {
-    RCLCPP_INFO(node_->get_logger(), "Footprint loaded successfully");
-  }
+        // Get sampler type
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.sampler_type",
+                rclcpp::ParameterValue(std::string("hybrid")));
+        node_->get_parameter(name_ + ".planner_params.sampler_type",
+                             planner_params_.sampler_type);
 
-  // Get sampler type
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.sampler_type",
-      rclcpp::ParameterValue(std::string("hybrid")));
-  node_->get_parameter(name_ + ".planner_params.sampler_type",
-                       planner_params_.sampler_type);
+        // Get objective type
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.objective_type",
+                rclcpp::ParameterValue(std::string("MoD-unaware")));
+        node_->get_parameter(name_ + ".planner_params.objective_type",
+                             planner_params_.objective_type);
 
-  // Get objective type
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.objective_type",
-      rclcpp::ParameterValue(std::string("MoD-unaware")));
-  node_->get_parameter(name_ + ".planner_params.objective_type",
-                       planner_params_.objective_type);
+        // Get weight euclidean
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.weight_euclidean",
+                rclcpp::ParameterValue(1.0));
+        node_->get_parameter(name_ + ".planner_params.weight_euclidean",
+                             planner_params_.weight_euclidean);
 
-  // Get weight euclidean
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.weight_euclidean",
-      rclcpp::ParameterValue(1.0));
-  node_->get_parameter(name_ + ".planner_params.weight_euclidean",
-                       planner_params_.weight_euclidean);
+        // Get weight quaternion
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.weight_quaternion",
+                rclcpp::ParameterValue(1.0));
+        node_->get_parameter(name_ + ".planner_params.weight_quaternion",
+                             planner_params_.weight_quaternion);
 
-  // Get weight quaternion
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.weight_quaternion",
-      rclcpp::ParameterValue(1.0));
-  node_->get_parameter(name_ + ".planner_params.weight_quaternion",
-                       planner_params_.weight_quaternion);
+        // Get weight mod
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.weight_mod", rclcpp::ParameterValue(0.0));
+        node_->get_parameter(name_ + ".planner_params.weight_mod",
+                             planner_params_.weight_mod);
 
-  // Get weight mod
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.weight_mod", rclcpp::ParameterValue(0.0));
-  node_->get_parameter(name_ + ".planner_params.weight_mod",
-                       planner_params_.weight_mod);
+        // Get cliffmap filename
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.cliffmap_filename",
+                rclcpp::ParameterValue(std::string("")));
+        node_->get_parameter(name_ + ".planner_params.cliffmap_filename",
+                             planner_params_.cliffmap_filename);
 
-  // Get cliffmap filename
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.cliffmap_filename",
-      rclcpp::ParameterValue(std::string("")));
-  node_->get_parameter(name_ + ".planner_params.cliffmap_filename",
-                       planner_params_.cliffmap_filename);
+        // Get gmmtmap filename
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.gmmtmap_filename",
+                rclcpp::ParameterValue(std::string("")));
+        node_->get_parameter(name_ + ".planner_params.gmmtmap_filename",
+                             planner_params_.gmmtmap_filename);
 
-  // Get gmmtmap filename
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.gmmtmap_filename",
-      rclcpp::ParameterValue(std::string("")));
-  node_->get_parameter(name_ + ".planner_params.gmmtmap_filename",
-                       planner_params_.gmmtmap_filename);
+        // Get gmmtmap filename
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.intensitymap_filename",
+                rclcpp::ParameterValue(std::string("")));
+        node_->get_parameter(name_ + ".planner_params.intensitymap_filename",
+                             planner_params_.intensitymap_filename);
 
-  // Get max planning time
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.max_planning_time",
-      rclcpp::ParameterValue(30.0));
-  node_->get_parameter(name_ + ".planner_params.max_planning_time",
-                       planner_params_.max_planning_time);
+        // Get max planning time
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.max_planning_time",
+                rclcpp::ParameterValue(30.0));
+        node_->get_parameter(name_ + ".planner_params.max_planning_time",
+                             planner_params_.max_planning_time);
 
-  // Get path resolution
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".planner_params.path_resolution",
-      rclcpp::ParameterValue(0.1));
-  node_->get_parameter(name_ + ".planner_params.path_resolution",
-                       planner_params_.path_resolution);
+        // Get path resolution
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".planner_params.path_resolution",
+                rclcpp::ParameterValue(0.1));
+        node_->get_parameter(name_ + ".planner_params.path_resolution",
+                             planner_params_.path_resolution);
 
-  // Get motion plan costs topic
-  nav2_util::declare_parameter_if_not_declared(
-      node_, name_ + ".motion_plan_costs_topic",
-      rclcpp::ParameterValue(std::string("motion_plan_costs")));
-  node_->get_parameter(name_ + ".motion_plan_costs_topic",
-                       motion_plan_costs_topic_);
+        // Get motion plan costs topic
+        nav2_util::declare_parameter_if_not_declared(
+                node_, name_ + ".motion_plan_costs_topic",
+                rclcpp::ParameterValue(std::string("motion_plan_costs")));
+        node_->get_parameter(name_ + ".motion_plan_costs_topic",
+                             motion_plan_costs_topic_);
 
-  // Create a car state space ptr
-  ompl::base::StateSpacePtr car_state_space(
-      new ompl::base::CarStateSpace(steering_params_.turning_radius));
+        // Create a car state space ptr
+        ompl::base::StateSpacePtr car_state_space(
+                new ompl::base::CarStateSpace(steering_params_.turning_radius));
 
-  // Initialize ompl simple setup.
-  simple_setup_ = std::make_shared<ompl::geometric::SimpleSetup>(
-      ompl::geometric::SimpleSetup(car_state_space));
+        // Initialize ompl simple setup.
+        simple_setup_ = std::make_shared<ompl::geometric::SimpleSetup>(
+                ompl::geometric::SimpleSetup(car_state_space));
 
-  ompl::base::RealVectorBounds bounds(2);
+        ompl::base::RealVectorBounds bounds(2);
 
-  if (!no_map_) {
-    bounds.low[0] = costmap_->getOriginX();
-    bounds.high[0] = costmap_->getOriginX() + costmap_->getSizeInMetersX();
-    bounds.low[1] = costmap_->getOriginY();
-    bounds.high[1] = costmap_->getOriginY() + costmap_->getSizeInMetersY();
 
-  } else {
-    bounds.low[0] = -10000;
-    bounds.low[1] = -10000;
-    bounds.high[0] = 10000;
-    bounds.high[1] = 10000;
-  }
-  car_state_space->as<ompl::base::SE2StateSpace>()->setBounds(bounds);
+        bounds.low[0] = costmap_->getOriginX();
+        bounds.high[0] = costmap_->getOriginX() + costmap_->getSizeInMetersX();
+        bounds.low[1] = costmap_->getOriginY();
+        bounds.high[1] = costmap_->getOriginY() + costmap_->getSizeInMetersY();
 
-  // Set-up planner
-  ompl::base::SpaceInformationPtr si(simple_setup_->getSpaceInformation());
-  auto planner = std::make_shared<ompl::geometric::PRMstar>(si);
+        car_state_space->as<ompl::base::SE2StateSpace>()->setBounds(bounds);
 
-  // Set the optimization objective based on the objective type parameter
-  // cliff-euc = UpstreamCriterionOptimizationObjective with cliffmap
-  // gmmt-euc = UpstreamCriterionOptimizationObjective with gmmtmap
-  // cliff-dtc = DownTheCLiFFOptimizationObjective with cliffmap
-  // path-length = PathLengthOptimizationObjective
-  std::shared_ptr<ompl::base::OptimizationObjective> opt_obj_;
-  if (planner_params_.objective_type == "cliff-euc") {
-    opt_obj_ =
-        std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
-            si, planner_params_.cliffmap_filename,
-            planner_params_.weight_euclidean);
-    simple_setup_->setOptimizationObjective(opt_obj_);
-  } else if (planner_params_.objective_type == "gmmt-euc") {
-    opt_obj_ =
-        std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
-            si, planner_params_.gmmtmap_filename,
-            planner_params_.weight_euclidean);
-    simple_setup_->setOptimizationObjective(opt_obj_);
-  } else if (planner_params_.objective_type == "cliff-dtc") {
-    opt_obj_ = std::make_shared<ompl::MoD::DTCOptimizationObjective>(
-        si, planner_params_.cliffmap_filename,
-        planner_params_.weight_euclidean);
-    simple_setup_->setOptimizationObjective(opt_obj_);
-  } else if (planner_params_.objective_type == "path-length") {
-    opt_obj_ =
-        std::make_shared<ompl::base::PathLengthOptimizationObjective>(si);
-    simple_setup_->setOptimizationObjective(opt_obj_);
-  } else {
-    RCLCPP_ERROR(node_->get_logger(), "Invalid objective type");
-  }
+        // Set-up planner
+        ompl::base::SpaceInformationPtr si(simple_setup_->getSpaceInformation());
+        auto planner = std::make_shared<ompl::geometric::AITstar>(si);
 
-  simple_setup_->setOptimizationObjective(opt_obj_);
-}
+        // Set the optimization objective based on the objective type parameter
+        // cliff-euc = UpstreamCriterionOptimizationObjective with cliffmap
+        // gmmt-euc = UpstreamCriterionOptimizationObjective with gmmtmap
+        // cliff-dtc = DownTheCLiFFOptimizationObjective with cliffmap
+        // path-length = PathLengthOptimizationObjective
+        std::shared_ptr<ompl::base::OptimizationObjective> opt_obj_;
+        if (planner_params_.objective_type == "cliff-euc") {
+            opt_obj_ =
+                    std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
+                            simple_setup_->getSpaceInformation(), ompl::MoD::MapType::CLiFFMap,
+                            planner_params_.cliffmap_filename, planner_params_.weight_euclidean,
+                            planner_params_.weight_quaternion, planner_params_.weight_mod, planner_params_.sampler_type,
+                            planner_params_.intensitymap_filename, planner_params_.sampling_bias, false);
+        } else if (planner_params_.objective_type == "gmmt-euc") {
+            opt_obj_ =
+                    std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
+                            simple_setup_->getSpaceInformation(), ompl::MoD::MapType::GMMTMap,
+                            planner_params_.gmmtmap_filename, planner_params_.weight_euclidean,
+                            planner_params_.weight_quaternion, planner_params_.weight_mod, planner_params_.sampler_type,
+                            planner_params_.intensitymap_filename, planner_params_.sampling_bias, false);
+        } else if (planner_params_.objective_type == "cliff-dtc") {
+            opt_obj_ = std::make_shared<ompl::MoD::DTCOptimizationObjective>(simple_setup_->getSpaceInformation(),
+                                                                             planner_params_.cliffmap_filename,
+                                                                             planner_params_.intensitymap_filename,
+                                                                             planner_params_.weight_euclidean,
+                                                                             planner_params_.weight_quaternion,
+                                                                             planner_params_.weight_mod,
+                                                                             steering_params_.max_vehicle_speed, 10,
+                                                                             true, planner_params_.sampler_type,
+                                                                             planner_params_.sampling_bias, false);
+        } else if (planner_params_.objective_type == "path-length") {
+            opt_obj_ =
+                    std::make_shared<ompl::base::PathLengthOptimizationObjective>(si);
+        } else {
+            RCLCPP_ERROR(node_->get_logger(), "Invalid objective type");
+        }
+
+        simple_setup_->setOptimizationObjective(opt_obj_);
+        simple_setup_->setStateValidityChecker(state_validity_checker_);
+    }
+
+    void MoDPlanner::activate() {
+        RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: Activating MoD planner!");
+    }
+
+    void MoDPlanner::deactivate() {
+        simple_setup_->clear();
+        RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: Deactivating MoD planner!");
+    }
+
+    void MoDPlanner::cleanup() {
+
+    }
+
+    nav_msgs::msg::Path
+    MoDPlanner::createPlan(const geometry_msgs::msg::PoseStamped &start, const geometry_msgs::msg::PoseStamped &goal) {
+
+        nav_msgs::msg::Path solution_path;
+
+        // Allocate new start and goal states
+        ompl::base::ScopedState<> start_state(simple_setup_->getStateSpace());
+        ompl::base::ScopedState<> goal_state(simple_setup_->getStateSpace());
+
+        // Set start and goal states from the ROS2 message types.
+        start_state->as<ompl::base::SE2StateSpace::StateType>()->setXY(start.pose.position.x, start.pose.position.y);
+        start_state->as<ompl::base::SE2StateSpace::StateType>()->setYaw(tf2::getYaw(start.pose.orientation));
+        goal_state->as<ompl::base::SE2StateSpace::StateType>()->setXY(goal.pose.position.x, goal.pose.position.y);
+        goal_state->as<ompl::base::SE2StateSpace::StateType>()->setYaw(tf2::getYaw(goal.pose.orientation));
+
+
+        // Set the start and goal states in simple setup
+        simple_setup_->setStartAndGoalStates(start_state, goal_state);
+
+        // Solve the problem.
+        ompl::base::PlannerStatus status = simple_setup_->solve(planner_params_.max_planning_time);
+
+        if (status) {
+
+            RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: Found a solution!");
+            // Get the solution path and return it as nav_msgs::Path
+            ompl::geometric::PathGeometric solution_path_ompl = simple_setup_->getSolutionPath();
+            solution_path.header.frame_id = global_frame_;
+            solution_path.header.stamp = node_->now();
+            solution_path.poses.resize(solution_path_ompl.getStateCount());
+
+            for (std::size_t i = 0; i < solution_path_ompl.getStateCount(); ++i) {
+                const auto *state = solution_path_ompl.getState(i)->as<ompl::base::SE2StateSpace::StateType>();
+                solution_path.poses[i].header = solution_path.header;
+                solution_path.poses[i].pose.position.x = state->getX();
+                solution_path.poses[i].pose.position.y = state->getY();
+                solution_path.poses[i].pose.position.z = 0.0;
+                solution_path.poses[i].pose.orientation = tf2::toMsg(tf2::Quaternion(
+                        tf2::Vector3(0, 0, 1), state->getYaw()));
+            }
+        } else {
+            RCLCPP_ERROR(node_->get_logger(), "[MoDPlanner]: No solution found!");
+        }
+
+        return solution_path;
+    }
 } // namespace nav2_mod_planner
