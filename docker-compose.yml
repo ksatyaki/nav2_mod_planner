@@ -1,0 +1,24 @@
+services:
+  bench_ros2:
+    image: bench_ros2
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    # ipc: host
+    network_mode: host
+    environment:
+      SDL_VIDEODRIVER: x11
+      DISPLAY: $DISPLAY
+      ROS_DOMAIN_ID: 34
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./:/home/ros/ws
+      - /dev/bus/usb/:/dev/bus/usb
+    stdin_open: true
+    privileged: true
+    group_add:
+      - video
+    tty: true
+    command: tail -f /dev/null
+    restart: always

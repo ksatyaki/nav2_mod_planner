@@ -1,0 +1,19 @@
+{
+	"name": "bench_ros2",
+	"dockerComposeFile": "../docker-compose.yml",
+	"service": "bench_ros2",
+    "remoteUser": "ros",
+    "workspaceFolder": "/home/ros/ws",
+    "customizations": {
+        "vscode": {
+        "extensions": [
+            "streetsidesoftware.code-spell-checker",
+            "ms-python.python",
+            "MS-vsliveshare.vsliveshare",
+            "ms-vscode.cmake-tools",
+            "github.copilot"
+        ]
+        }
+    },
+    "forwardPorts": [6006] 
+}
