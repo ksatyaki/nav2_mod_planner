@@ -1,11 +1,11 @@
-FROM althack/ros2:humble-cuda-gazebo-nvidia
+FROM osrf/ros:humble-desktop-full
 
 ENV ROS_DISTRO=humble
-ENV AMENT_PREFIX_PATH=/opt/ros/humble
-ENV COLCON_PREFIX_PATH=/opt/ros/humble
-ENV LD_LIBRARY_PATH=/opt/ros/humble/lib
-ENV PATH=/opt/ros/humble/bin:$PATH
-ENV PYTHONPATH=/opt/ros/humble/lib/python3.8/site-packages
+ENV AMENT_PREFIX_PATH=/opt/ros/${ROS_DISTRO}
+ENV COLCON_PREFIX_PATH=/opt/ros/${ROS_DISTRO}
+ENV LD_LIBRARY_PATH=/opt/ros/${ROS_DISTRO}/lib
+ENV PATH=/opt/ros/${ROS_DISTRO}/bin:$PATH
+ENV PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.8/site-packages
 ENV ROS_PYTHON_VERSION=3
 ENV ROS_VERSION=2
 
@@ -48,47 +48,15 @@ RUN apt-get update && apt-get install -y \
   htop \
   xterm \
   unzip \
-  ros-humble-ament-package \
-  ros-humble-desktop-full \
+  ros-${ROS_DISTRO}-ament-package \
+  ros-${ROS_DISTRO}-desktop-full \
   # Install ros distro testing packages
-  ros-humble-ament-lint \
-  ros-humble-launch-testing \
-  ros-humble-launch-testing-ament-cmake \
-  ros-humble-launch-testing-ros \
-  python3-autopep8 \
-  && rm -rf /var/lib/apt/lists/* \
-  && rosdep init || echo "rosdep already initialized"
-
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF \
-    && echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | tee /etc/apt/sources.list.d/mono-official-stable.list \
-    && apt-get update \
-    && apt-get -y install --no-install-recommends \
-    openssh-client \
-    gpg \
-    openssh-client \
-    mplayer \
-    git-core \
-    libu2f-udev \
-    apt-transport-https \
-    && apt-get autoremove -y \
-    && apt-get clean -y \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF \
-    && echo "deb https://download.mono-project.com/repo/ubuntu stable-focal main" | tee /etc/apt/sources.list.d/mono-official-stable.list \
-    && apt-get update \
-    && apt-get -y install --no-install-recommends \
-    xdg-utils \
-    && apt-get autoremove -y \
-    && apt-get clean -y \
-    && rm -rf /var/lib/apt/lists/*
-
-## Install cyclone DDS
-RUN apt-get update \ 
-    && apt-get -y install ros-humble-rmw-cyclonedds-cpp \
-    && apt-get autoremove -y \
-    && apt-get clean -y \
-    && rm -rf /var/lib/apt/lists/*
+  ros-${ROS_DISTRO}-ament-lint \
+  ros-${ROS_DISTRO}-launch-testing \
+  ros-${ROS_DISTRO}-launch-testing-ament-cmake \
+  ros-${ROS_DISTRO}-launch-testing-ros \
+  xdg-utils \
+  ros-${ROS_DISTRO}-rmw-cyclonedds-cpp 
 
 ARG USERNAME=ros
 ARG USER_UID=1000
@@ -104,7 +72,16 @@ ARG CMAKE_BUILD_TYPE=RelWithDebInfo
 
 ENV DEBIAN_FRONTEND=dialog
 
-RUN 
+RUN addgroup --gid $USER_GID ${USERNAME} && \
+useradd -s /bin/bash -m -c "AppleBot ROS User" ${USERNAME} -p "" -u ${USER_UID} -g ${USER_GID} -G sudo && \
+    echo '${USERNAME} ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
+    chmod 0440 /etc/sudoers && \
+    chmod g+w /etc/passwd
+
+RUN adduser ros dialout
+RUN groupadd render
+RUN usermod -a -G video ros
+RUN usermod -a -G render ros
 
 # Create source folder
 WORKDIR $WS
@@ -113,19 +90,22 @@ RUN mkdir ws
 # Install ros dependencies
 COPY --chown=$USERNAME ../ ws
 
-RUN apt-get update && \
-    rosdep update && \
-    rosdep install --from-paths ws --ignore-src -y && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update
+RUN apt-get dist-upgrade -y
+RUN rosdep update
+RUN rosdep install --from-paths ws --ignore-src -y
+RUN rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
+RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
+RUN sed -i 's/font/pure/g' ${HOME}/.bashrc
+
 RUN sudo chown -R ${USERNAME}:${USERNAME} /home/${USERNAME} 
-RUN . /opt/ros/humble/setup.sh && \
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     cd /home/${USERNAME}/ws && \
     colcon build --merge-install --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
 
 RUN echo "if [ -f /home/ros/install/setup.bash ]; then source /home/ros/install/setup.bash; fi" >> /home/${USERNAME}/.bashrc
 RUN echo "export RCUTILS_COLORIZED_OUTPUT=1" >> /home/${USERNAME}/.bashrc
 RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/ros/.bashrc
-
-RUN sudo adduser ${USERNAME} dialout
+RUN echo "ulimit -n 1024" >> /home/ros/.bashrc
