@@ -56,7 +56,14 @@ RUN apt-get update && apt-get install -y \
   ros-${ROS_DISTRO}-launch-testing-ament-cmake \
   ros-${ROS_DISTRO}-launch-testing-ros \
   xdg-utils \
-  ros-${ROS_DISTRO}-rmw-cyclonedds-cpp 
+  ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+  lsb-release \
+  gnupg
+
+RUN sudo curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+RUN apt-get update
+RUN apt-get install ignition-fortress ros-${ROS_DISTRO}-turtlebot4-simulator -y
 
 ARG USERNAME=ros
 ARG USER_UID=1000
@@ -102,7 +109,7 @@ RUN sed -i 's/font/pure/g' ${HOME}/.bashrc
 
 RUN sudo chown -R ${USERNAME}:${USERNAME} /home/${USERNAME} 
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    cd /home/${USERNAME}/ws && \
+    cd /home/${USERNAME} && \
     colcon build --merge-install --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
 
 RUN echo "if [ -f /home/ros/install/setup.bash ]; then source /home/ros/install/setup.bash; fi" >> /home/${USERNAME}/.bashrc

@@ -1,5 +1,6 @@
 services:
   bench_ros2:
+    container_name: motion-planning
     image: bench_ros2
     build:
       context: .
@@ -22,3 +23,12 @@ services:
     tty: true
     command: tail -f /dev/null
     restart: always
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: "all"
+              capabilities: [compute,utility,graphics,display]
+  
