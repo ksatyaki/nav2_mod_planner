@@ -56,8 +56,8 @@ add_library(${library_name} SHARED
         )
 
 target_link_libraries(${library_name}
-        ${ompl_LIBRARIES}
         ${mod_LIBRARIES}
+        ${ompl_LIBRARIES}
         )
 
 ament_target_dependencies(${library_name}
@@ -79,6 +79,13 @@ install(DIRECTORY include/
         )
 
 install(FILES global_planner_plugin.xml
+        DESTINATION share/${PROJECT_NAME}
+        )
+
+# install the launch and params folders
+install(DIRECTORY
+        launch
+        params
         DESTINATION share/${PROJECT_NAME}
         )
 

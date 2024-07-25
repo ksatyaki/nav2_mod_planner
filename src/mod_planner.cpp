@@ -154,14 +154,14 @@ namespace nav2_mod_planner {
                             simple_setup_->getSpaceInformation(), ompl::MoD::MapType::CLiFFMap,
                             planner_params_.cliffmap_filename, planner_params_.weight_euclidean,
                             planner_params_.weight_quaternion, planner_params_.weight_mod, planner_params_.sampler_type,
-                            planner_params_.intensitymap_filename, planner_params_.sampling_bias, false);
+                            planner_params_.intensitymap_filename, planner_params_.sampling_bias, true, false);
         } else if (planner_params_.objective_type == "gmmt-euc") {
             opt_obj_ =
                     std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
                             simple_setup_->getSpaceInformation(), ompl::MoD::MapType::GMMTMap,
                             planner_params_.gmmtmap_filename, planner_params_.weight_euclidean,
                             planner_params_.weight_quaternion, planner_params_.weight_mod, planner_params_.sampler_type,
-                            planner_params_.intensitymap_filename, planner_params_.sampling_bias, false);
+                            planner_params_.intensitymap_filename, planner_params_.sampling_bias, true, false);
         } else if (planner_params_.objective_type == "cliff-dtc") {
             opt_obj_ = std::make_shared<ompl::MoD::DTCOptimizationObjective>(simple_setup_->getSpaceInformation(),
                                                                              planner_params_.cliffmap_filename,
@@ -171,7 +171,7 @@ namespace nav2_mod_planner {
                                                                              planner_params_.weight_mod,
                                                                              steering_params_.max_vehicle_speed, 10,
                                                                              true, planner_params_.sampler_type,
-                                                                             planner_params_.sampling_bias, false);
+                                                                             planner_params_.sampling_bias, true, false);
         } else if (planner_params_.objective_type == "path-length") {
             opt_obj_ =
                     std::make_shared<ompl::base::PathLengthOptimizationObjective>(si);

@@ -1,0 +1,54 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/ksatyaki/ws/install/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/ksatyaki/ws/src/nav2_mod_planner/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_amcl/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_behavior_tree/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_behaviors/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_bt_navigator/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_collision_monitor/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_constrained_smoother/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_controller/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_core/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_costmap_2d/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_dwb_controller/costmap_queue/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_dwb_controller/dwb_core/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_dwb_controller/dwb_critics/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_dwb_controller/dwb_plugins/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_dwb_controller/nav_2d_utils/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_graceful_controller/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_lifecycle_manager/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_map_server/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_mppi_controller/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_navfn_planner/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_planner/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_regulated_pure_pursuit_controller/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_rotation_shim_controller/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_rviz_plugins/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_smac_planner/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_smoother/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_theta_star_planner/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_util/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_velocity_smoother/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_voxel_grid/include/**",
+        "/home/ksatyaki/ws/src/navigation2/nav2_waypoint_follower/include/**",
+        "/home/ksatyaki/ws/src/oxts_ros2_driver/oxts_driver/include/**",
+        "/home/ksatyaki/ws/src/oxts_ros2_driver/oxts_ins/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

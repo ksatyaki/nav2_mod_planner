@@ -58,6 +58,7 @@ RUN apt-get update && apt-get install -y \
   xdg-utils \
   ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
   lsb-release \
+  tmux \
   gnupg
 
 RUN sudo curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
@@ -65,12 +66,13 @@ RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/p
 RUN apt-get update
 RUN apt-get install ignition-fortress ros-${ROS_DISTRO}-turtlebot4-simulator -y
 
+
+RUN pip install tmule
+
 ARG USERNAME=ros
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-
-ARG USERNAME=ros
-ARG WORKSPACE=/home/${USERNAME}
+ARG WORKSPACE=/home/${USERNAME}/ws
 
 ENV HOME=/home/${USERNAME}
 ENV WS=${WORKSPACE}
@@ -78,6 +80,8 @@ ENV WS=${WORKSPACE}
 ARG CMAKE_BUILD_TYPE=RelWithDebInfo
 
 ENV DEBIAN_FRONTEND=dialog
+
+RUN echo "Creating user ${USERNAME} with UID ${USER_UID} and GID ${USER_GID}"
 
 RUN addgroup --gid $USER_GID ${USERNAME} && \
 useradd -s /bin/bash -m -c "AppleBot ROS User" ${USERNAME} -p "" -u ${USER_UID} -g ${USER_GID} -G sudo && \
@@ -90,29 +94,29 @@ RUN groupadd render
 RUN usermod -a -G video ros
 RUN usermod -a -G render ros
 
-# Create source folder
+# Create source folder and copy contents of this repo and other repos in this workspace. 
 WORKDIR $WS
-RUN mkdir ws
-
-# Install ros dependencies
-COPY --chown=$USERNAME ../ ws
-
-RUN apt-get update
-RUN apt-get dist-upgrade -y
-RUN rosdep update
-RUN rosdep install --from-paths ws --ignore-src -y
-RUN rm -rf /var/lib/apt/lists/*
+RUN mkdir src
+COPY --chown=$USERNAME . $WORKSPACE/src/
 
 USER $USERNAME
+RUN sudo chown -R ros:ros /home/ros
+
+RUN sudo apt-get update && \
+    rosdep fix-permissions && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -y
+
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && colcon build --merge-install --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
 RUN sed -i 's/font/pure/g' ${HOME}/.bashrc
 
-RUN sudo chown -R ${USERNAME}:${USERNAME} /home/${USERNAME} 
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    cd /home/${USERNAME} && \
-    colcon build --merge-install --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
+RUN sudo apt-get update
+RUN sudo apt-get dist-upgrade -y
+RUN sudo rm -rf /var/lib/apt/lists/*
 
-RUN echo "if [ -f /home/ros/install/setup.bash ]; then source /home/ros/install/setup.bash; fi" >> /home/${USERNAME}/.bashrc
+
+RUN echo "if [ -f ${WORKSPACE}/install/setup.bash ]; then source ${WORKSPACE}/install/setup.bash; fi" >> /home/ros/.bashrc
 RUN echo "export RCUTILS_COLORIZED_OUTPUT=1" >> /home/${USERNAME}/.bashrc
-RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/ros/.bashrc
-RUN echo "ulimit -n 1024" >> /home/ros/.bashrc
+RUN echo "ulimit -n 1024" >> /home/${USERNAME}/.bashrc

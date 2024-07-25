@@ -1,0 +1,11 @@
+<launch>
+    <arg name="sim" default="false"/>
+
+    <node name="slam_toolbox"
+          pkg="slam_toolbox"
+          exec="async_slam_toolbox_node">
+        <param name="use_sim_time" value="$(var sim)"/>
+        <param from="$(find-pkg-share nav2_mod_planner)/params/mapping.yaml"/>
+        <remap from="map" to="slam_map"/>
+    </node>    
+</launch>
