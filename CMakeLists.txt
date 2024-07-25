@@ -25,7 +25,8 @@ find_package(pluginlib REQUIRED)
 find_package(mod REQUIRED)
 find_package(ompl REQUIRED)
 
-MESSAGE(STATUS "OMPL_INCLUDE_DIR: ${OMPL_INCLUDE_DIR}")
+MESSAGE(STATUS "nav2_mod_planner: OMPL_INCLUDE_DIR is ${OMPL_INCLUDE_DIR}")
+MESSAGE(STATUS "nav2_mod_planner: OMPL_LIBRARIES ${OMPL_LIBRARIES}")
 
 include_directories(
         include
@@ -57,7 +58,7 @@ add_library(${library_name} SHARED
 
 target_link_libraries(${library_name}
         ${mod_LIBRARIES}
-        ${ompl_LIBRARIES}
+        ${OMPL_LIBRARIES}
         )
 
 ament_target_dependencies(${library_name}
