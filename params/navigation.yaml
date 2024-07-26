@@ -82,12 +82,6 @@ controller_server:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
       movement_time_allowance: 10.0
-    # Goal checker parameters
-    #precise_goal_checker:
-    #  plugin: "nav2_controller::SimpleGoalChecker"
-    #  xy_goal_tolerance: 0.25
-    #  yaw_goal_tolerance: 0.25
-    #  stateful: True
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
@@ -165,7 +159,7 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05
-      footprint: "[ [-0.5, -0.6], [-0.9, 0], [-0.5, 0.6], [0.5, 0.6], [1.1, 0], [0.5, -0.6] ]"
+      footprint: "[ [-0.15, -0.15], [-0.15, 0.15], [0.15, 0.15], [0.15, -0.15] ]"
       footprint_padding: 0.01
       plugins: ["static_layer", "voxel_layer", "inflation_layer"]
       static_layer:
@@ -223,7 +217,7 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
-      footprint: "[ [-0.5, -0.6], [-0.9, 0], [-0.5, 0.6], [0.5, 0.6], [1.1, 0], [0.5, -0.6] ]"
+      footprint: "[ [-0.15, -0.15], [-0.15, 0.15], [0.15, 0.15], [0.15, -0.15] ]"
       footprint_padding: 0.01
       resolution: 0.05
       track_unknown_space: true
@@ -283,13 +277,14 @@ planner_server:
         turning_radius: 0.25
         max_vehicle_speed: 0.3
       planner_params:
+        planner_type: "prmstar"
         sampler_type: "hybrid"
         objective_type: "path-length"
         weight_euclidean: 1.0
         weight_quaternion: 1.0
         weight_mod: 0.1
         sampling_bias: 0.1
-        max_planning_time: 10.0
+        max_planning_time: 4.0
         double path_resolution: 0.05
       smooth_path: True # If true, does a simple and quick smoothing post-processing to the path
       smoother:
@@ -318,7 +313,7 @@ behavior_server:
   ros__parameters:
     costmap_topic: local_costmap/costmap_raw
     footprint_topic: local_costmap/published_footprint
-    cycle_frequency: 10.0
+    cycle_frequency: 0.05
     behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
     spin:
       plugin: "nav2_behaviors/Spin"

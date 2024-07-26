@@ -11,16 +11,7 @@ namespace nav2_mod_planner {
 
 MoDPlanner::MoDPlanner() {}
 
-void MoDPlanner::configure(
-    const rclcpp_lifecycle::LifecycleNode::WeakPtr &parent, std::string name,
-    std::shared_ptr<tf2_ros::Buffer> tf,
-    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) {
-  node_ = parent.lock();
-  tf_ = tf;
-  name_ = name;
-  costmap_ = costmap_ros->getCostmap();
-  global_frame_ = costmap_ros->getGlobalFrameID();
-
+void MoDPlanner::getParameters() {
   // Initialize planner params using
   // nav2_util::declare_parameter_if_not_declared
 
@@ -114,6 +105,15 @@ void MoDPlanner::configure(
   node_->get_parameter(name_ + ".motion_plan_costs_topic",
                        motion_plan_costs_topic_);
 
+  // Get planner type
+  nav2_util::declare_parameter_if_not_declared(
+      node_, name_ + ".planner_params.planner_type",
+      rclcpp::ParameterValue(std::string("rrtstar")));
+  node_->get_parameter(name_ + ".planner_params.planner_type",
+                       planner_params_.planner_type);
+}
+
+void MoDPlanner::initSimpleSetup() {
   // Create a car state space ptr
   ompl::base::StateSpacePtr car_state_space(
       new ompl::base::CarStateSpace(steering_params_.turning_radius));
@@ -133,16 +133,16 @@ void MoDPlanner::configure(
 
   // Set-up planner
   ompl::base::SpaceInformationPtr si(simple_setup_->getSpaceInformation());
-  auto planner = std::make_shared<ompl::geometric::AITstar>(si);
+}
 
+void MoDPlanner::initOptimizationObjectiveAndSampler() {
   // Set the optimization objective based on the objective type parameter
   // cliff-euc = UpstreamCriterionOptimizationObjective with cliffmap
   // gmmt-euc = UpstreamCriterionOptimizationObjective with gmmtmap
   // cliff-dtc = DownTheCLiFFOptimizationObjective with cliffmap
   // path-length = PathLengthOptimizationObjective
-  std::shared_ptr<ompl::base::OptimizationObjective> opt_obj_;
   if (planner_params_.objective_type == "cliff-euc") {
-    opt_obj_ =
+    optimization_objective_ =
         std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
             simple_setup_->getSpaceInformation(), ompl::MoD::MapType::CLiFFMap,
             planner_params_.cliffmap_filename, planner_params_.weight_euclidean,
@@ -150,7 +150,7 @@ void MoDPlanner::configure(
             planner_params_.sampler_type, planner_params_.intensitymap_filename,
             planner_params_.sampling_bias, true, false);
   } else if (planner_params_.objective_type == "gmmt-euc") {
-    opt_obj_ =
+    optimization_objective_ =
         std::make_shared<ompl::MoD::UpstreamCriterionOptimizationObjective>(
             simple_setup_->getSpaceInformation(), ompl::MoD::MapType::GMMTMap,
             planner_params_.gmmtmap_filename, planner_params_.weight_euclidean,
@@ -158,32 +158,70 @@ void MoDPlanner::configure(
             planner_params_.sampler_type, planner_params_.intensitymap_filename,
             planner_params_.sampling_bias, true, false);
   } else if (planner_params_.objective_type == "cliff-dtc") {
-    opt_obj_ = std::make_shared<ompl::MoD::DTCOptimizationObjective>(
-        simple_setup_->getSpaceInformation(), planner_params_.cliffmap_filename,
-        planner_params_.intensitymap_filename, planner_params_.weight_euclidean,
-        planner_params_.weight_quaternion, planner_params_.weight_mod,
-        steering_params_.max_vehicle_speed, 10, true,
-        planner_params_.sampler_type, planner_params_.sampling_bias, true,
-        false);
+    optimization_objective_ =
+        std::make_shared<ompl::MoD::DTCOptimizationObjective>(
+            simple_setup_->getSpaceInformation(),
+            planner_params_.cliffmap_filename,
+            planner_params_.intensitymap_filename,
+            planner_params_.weight_euclidean, planner_params_.weight_quaternion,
+            planner_params_.weight_mod, steering_params_.max_vehicle_speed, 10,
+            true, planner_params_.sampler_type, planner_params_.sampling_bias,
+            true, false);
   } else if (planner_params_.objective_type == "path-length") {
-    opt_obj_ =
-        std::make_shared<ompl::base::PathLengthOptimizationObjective>(si);
+    optimization_objective_ =
+        std::make_shared<ompl::base::PathLengthOptimizationObjective>(
+            simple_setup_->getSpaceInformation());
   } else {
     RCLCPP_ERROR(node_->get_logger(), "Invalid objective type");
   }
+}
+
+void MoDPlanner::initPlanner() {
+  if (planner_params_.planner_type == "rrtstar")
+    planner_ = std::make_shared<ompl::geometric::RRTstar>(
+        simple_setup_->getSpaceInformation());
+  else if (planner_params_.planner_type == "aitstar")
+    planner_ = std::make_shared<ompl::geometric::AITstar>(
+        simple_setup_->getSpaceInformation());
+  else if (planner_params_.planner_type == "prmstar")
+    planner_ = std::make_shared<ompl::geometric::PRMstar>(
+        simple_setup_->getSpaceInformation());
+  else {
+    RCLCPP_WARN(node_->get_logger(),
+                "Invalid planner type. Choosing PRMstar as default.");
+    planner_ = std::make_shared<ompl::geometric::PRMstar>(
+        simple_setup_->getSpaceInformation());
+  }
+}
+
+void MoDPlanner::configure(
+    const rclcpp_lifecycle::LifecycleNode::WeakPtr &parent, std::string name,
+    std::shared_ptr<tf2_ros::Buffer> tf,
+    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) {
+  node_ = parent.lock();
+  tf_ = tf;
+  name_ = name;
+  costmap_ = costmap_ros->getCostmap();
+  global_frame_ = costmap_ros->getGlobalFrameID();
+
+  getParameters();
+
+  initSimpleSetup();
+
+  initOptimizationObjectiveAndSampler();
+  simple_setup_->setOptimizationObjective(optimization_objective_);
+
+  initPlanner();
+  simple_setup_->setPlanner(planner_);
 
   std::shared_ptr<
       nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>>
       footprint_collision_checker_ptr =
           std::make_shared<nav2_costmap_2d::FootprintCollisionChecker<
               nav2_costmap_2d::Costmap2D *>>(costmap_);
-
   state_validity_checker_ = std::make_shared<FootprintStateValidityChecker>(
       simple_setup_->getSpaceInformation(), footprint_collision_checker_ptr,
       costmap_ros->getRobotFootprint());
-
-  simple_setup_->setPlanner(planner);
-  simple_setup_->setOptimizationObjective(opt_obj_);
   simple_setup_->setStateValidityChecker(state_validity_checker_);
 
   RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: Configured MoD planner!");
@@ -198,14 +236,24 @@ void MoDPlanner::deactivate() {
   RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: Deactivating MoD planner!");
 }
 
-void MoDPlanner::cleanup() {}
+void MoDPlanner::cleanup() {
+  planner_.reset();
+  state_validity_checker_.reset();
+  optimization_objective_.reset();
+  simple_setup_.reset();
+
+  RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: Cleaning up MoD planner!");
+}
 
 nav_msgs::msg::Path MoDPlanner::createPlan(
     const geometry_msgs::msg::PoseStamped &start,
     const geometry_msgs::msg::PoseStamped &goal) {
   nav_msgs::msg::Path solution_path;
 
-  RCLCPP_INFO(node_->get_logger(), "[MoDPlanner]: createPlan will now attempt to find a solution for %lf seconds.", planner_params_.max_planning_time);
+  RCLCPP_INFO(node_->get_logger(),
+              "[MoDPlanner]: createPlan will now attempt to find a solution "
+              "for %lf seconds.",
+              planner_params_.max_planning_time);
 
   // Allocate new start and goal states
   ompl::base::ScopedState<> start_state(simple_setup_->getStateSpace());
@@ -250,13 +298,13 @@ nav_msgs::msg::Path MoDPlanner::createPlan(
   } else if (status == ompl::base::PlannerStatus::TIMEOUT) {
     RCLCPP_ERROR(node_->get_logger(), "[MoDPlanner 1]: Timed out.");
   } else {
-    RCLCPP_ERROR(node_->get_logger(), "[MoDPlanner]: Status not exact solution from OMPL!");
+    RCLCPP_ERROR(node_->get_logger(),
+                 "[MoDPlanner]: Status not exact solution from OMPL!");
   }
 
   return solution_path;
 }
 }  // namespace nav2_mod_planner
-
 
 namespace ompl {
 namespace base {
@@ -268,8 +316,8 @@ unsigned int CarStateSpace::validSegmentCount(const State *state1,
   return longestValidSegmentCountFactor_ *
          (unsigned int)ceil(distance(state1, state2) / longestValidSegment_);
 }
-} // namespace base
-} // namespace ompl
+}  // namespace base
+}  // namespace ompl
 
 #include "pluginlib/class_list_macros.hpp"
 PLUGINLIB_EXPORT_CLASS(nav2_mod_planner::MoDPlanner, nav2_core::GlobalPlanner)

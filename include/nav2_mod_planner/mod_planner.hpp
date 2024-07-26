@@ -43,6 +43,14 @@ class MoDPlanner : public nav2_core::GlobalPlanner {
       const geometry_msgs::msg::PoseStamped &start,
       const geometry_msgs::msg::PoseStamped &goal) override;
 
+  void getParameters();
+
+  void initSimpleSetup();
+
+  void initPlanner();
+
+  void initOptimizationObjectiveAndSampler();
+
  private:
   struct steering_params {
     double turning_radius;
@@ -57,6 +65,7 @@ class MoDPlanner : public nav2_core::GlobalPlanner {
     double sampling_bias;
     double max_planning_time;
     double path_resolution;
+    std::string planner_type;
   } planner_params_;
 
   // TF buffer
@@ -79,6 +88,8 @@ class MoDPlanner : public nav2_core::GlobalPlanner {
 
   // Optimization Objective ptr
   std::shared_ptr<ompl::base::OptimizationObjective> optimization_objective_;
+
+  std::shared_ptr<ompl::base::Planner> planner_;
 
   class FootprintStateValidityChecker
       : public ompl::base::StateValidityChecker {
