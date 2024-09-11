@@ -3,7 +3,7 @@
 	"dockerComposeFile": "../docker-compose.yml",
 	"service": "bench_ros2",
     "remoteUser": "ros",
-    "workspaceFolder": "/home/ros/ws",
+    "workspaceFolder": "/home/ros/ws/src/nav2_mod_planner",
     "customizations": {
         "vscode": {
         "extensions": [
